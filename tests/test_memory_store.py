@@ -3,30 +3,30 @@ import time
 import pytest
 from memory.memory_item import MemoryItem, MemoryType
 from memory.memory_store import MemoryStore
-from memory.forgetting_strategies import LRUForgetting, SalienceForgetting
+from memory.forgetting_strategies import LRUForgetting, SalienceForgetting, ForgettingStrategy
 
 
-def fresh_store(strategy=None, max_size=100):
+def fresh_store(strategy: ForgettingStrategy | None = None, max_size: int = 100) -> MemoryStore:
     return MemoryStore(strategy=strategy or LRUForgetting(), max_size=max_size)
 
 
-def make_item(content="x", salience=0.5, memory_type=MemoryType.EPISODIC):
+def make_item(content: str = "x", salience: float = 0.5, memory_type: MemoryType = MemoryType.EPISODIC) -> MemoryItem:
     return MemoryItem(content, memory_type=memory_type, salience=salience)
 
 
 class TestAdd:
-    def test_add_increases_size(self):
+    def test_add_increases_size(self) -> None:
         store = fresh_store()
         store.add(make_item("a"))
         assert store.size == 1
 
-    def test_add_returns_item(self):
+    def test_add_returns_item(self) -> None:
         store = fresh_store()
         item = make_item("b")
         returned = store.add(item)
         assert returned is item
 
-    def test_capacity_enforced(self):
+    def test_capacity_enforced(self) -> None:
         store = fresh_store(max_size=3)
         for i in range(5):
             store.add(make_item(f"item{i}"))
@@ -34,23 +34,23 @@ class TestAdd:
 
 
 class TestGet:
-    def test_get_returns_item(self):
+    def test_get_returns_item(self) -> None:
         store = fresh_store()
         item = store.add(make_item("hello"))
         assert store.get(item.id) is item
 
-    def test_get_missing_returns_none(self):
+    def test_get_missing_returns_none(self) -> None:
         store = fresh_store()
         assert store.get("nonexistent") is None
 
-    def test_get_records_access(self):
+    def test_get_records_access(self) -> None:
         store = fresh_store()
         item = store.add(make_item("touch me"))
         count_before = item.access_count
         store.get(item.id)
         assert item.access_count == count_before + 1
 
-    def test_get_no_record_access(self):
+    def test_get_no_record_access(self) -> None:
         store = fresh_store()
         item = store.add(make_item("no touch"))
         store.get(item.id, record_access=False)
@@ -58,7 +58,7 @@ class TestGet:
 
 
 class TestSearch:
-    def test_search_by_content(self):
+    def test_search_by_content(self) -> None:
         store = fresh_store()
         store.add(make_item("AWS S3 pricing"))
         store.add(make_item("Lambda functions"))
@@ -66,14 +66,14 @@ class TestSearch:
         results = store.search(lambda m: "s3" in str(m.content).lower())
         assert len(results) == 2
 
-    def test_search_respects_limit(self):
+    def test_search_respects_limit(self) -> None:
         store = fresh_store()
         for i in range(10):
             store.add(make_item(f"item{i}"))
         results = store.search(lambda m: True, limit=3)
         assert len(results) == 3
 
-    def test_search_by_type(self):
+    def test_search_by_type(self) -> None:
         store = fresh_store()
         store.add(make_item("episodic", memory_type=MemoryType.EPISODIC))
         store.add(make_item("semantic", memory_type=MemoryType.SEMANTIC))
@@ -82,7 +82,7 @@ class TestSearch:
 
 
 class TestForget:
-    def test_forget_removes_items(self):
+    def test_forget_removes_items(self) -> None:
         store = fresh_store()
         for i in range(5):
             store.add(make_item(f"item{i}"))
@@ -90,17 +90,17 @@ class TestForget:
         assert len(removed) == 2
         assert store.size == 3
 
-    def test_forget_item_by_id(self):
+    def test_forget_item_by_id(self) -> None:
         store = fresh_store()
         item = store.add(make_item("to remove"))
         store.forget_item(item.id)
         assert store.get(item.id) is None
 
-    def test_forget_item_missing_returns_none(self):
+    def test_forget_item_missing_returns_none(self) -> None:
         store = fresh_store()
         assert store.forget_item("fake-id") is None
 
-    def test_prune_below_retention(self):
+    def test_prune_below_retention(self) -> None:
         store = fresh_store()
         fresh = store.add(make_item("fresh"))
         stale = store.add(make_item("stale"))
@@ -111,7 +111,7 @@ class TestForget:
 
 
 class TestConsolidate:
-    def test_promotes_high_salience_working(self):
+    def test_promotes_high_salience_working(self) -> None:
         store = fresh_store()
         high = store.add(MemoryItem("important", memory_type=MemoryType.WORKING, salience=0.9))
         low = store.add(MemoryItem("trivial", memory_type=MemoryType.WORKING, salience=0.2))
@@ -119,13 +119,13 @@ class TestConsolidate:
         assert high in promoted
         assert high.memory_type == MemoryType.EPISODIC
 
-    def test_discards_low_salience_working(self):
+    def test_discards_low_salience_working(self) -> None:
         store = fresh_store()
         low = store.add(MemoryItem("trivial", memory_type=MemoryType.WORKING, salience=0.1))
         store.consolidate(salience_threshold=0.5)
         assert store.get(low.id) is None
 
-    def test_non_working_untouched(self):
+    def test_non_working_untouched(self) -> None:
         store = fresh_store()
         ep = store.add(MemoryItem("event", memory_type=MemoryType.EPISODIC, salience=0.9))
         store.consolidate()
@@ -133,12 +133,12 @@ class TestConsolidate:
 
 
 class TestStats:
-    def test_empty_stats(self):
+    def test_empty_stats(self) -> None:
         store = fresh_store()
         stats = store.stats()
         assert stats["size"] == 0
 
-    def test_stats_keys(self):
+    def test_stats_keys(self) -> None:
         store = fresh_store()
         store.add(make_item("x"))
         stats = store.stats()
@@ -146,7 +146,7 @@ class TestStats:
                     "avg_salience", "type_counts"):
             assert key in stats
 
-    def test_type_counts(self):
+    def test_type_counts(self) -> None:
         store = fresh_store()
         store.add(MemoryItem("ep", memory_type=MemoryType.EPISODIC))
         store.add(MemoryItem("sem", memory_type=MemoryType.SEMANTIC))
